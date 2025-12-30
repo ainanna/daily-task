@@ -24,13 +24,19 @@ self.addEventListener("activate", event => {
  event.waitUntil(
   caches.keys().then(keys =>
    Promise.all(
-    keys
-     .filter(k => k !== CACHE_NAME)
-     .map(k => caches.delete(k))
+    keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
    )
   )
  );
+
  self.clients.claim();
+
+ // 🔔 KIRIM NOTIFIKASI UPDATE
+ self.clients.matchAll({ type: "window" }).then(clients => {
+  clients.forEach(client => {
+   client.postMessage({ type: "UPDATE_READY", version: VERSION });
+  });
+ });
 });
 
 /* ===== FETCH (Network First, SAFE) ===== */
