@@ -239,6 +239,7 @@ button.primary{background:var(--accent);color:#000}
 }
 .calc-keypad button[data-back]{
  grid-column: span;
+ background:#243056;
 }
 </style>
 </head>
@@ -493,10 +494,19 @@ row.addEventListener("drop", e => {
    const cb=document.createElement("input");
    cb.type="checkbox";
    cb.checked=c.progress[t.id].checked;
- cb.onchange = () => {
+cb.onchange = () => {
  c.progress[t.id].checked = cb.checked;
 
- // PATCH: user action = hapus highlight
+ if (t.max) {
+  c.progress[t.id].count = cb.checked ? t.max : 0;
+
+  // update teks counter
+  const span = row.querySelector("span");
+  if (span) {
+   span.textContent = `${c.progress[t.id].count}/${t.max}`;
+  }
+ }
+
  row.classList.remove("reset-now");
 
  save();
@@ -994,9 +1004,9 @@ document.querySelector(".calc-keypad button[data-back]").onclick = ()=>{
    <button data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button>
    <button data-n="4">4</button><button data-n="5">5</button><button data-n="6">6</button>
    <button data-n="7">7</button><button data-n="8">8</button><button data-n="9">9</button>
-   <button data-back="1">⌫</button><button data-n="0">0</button><button class="calc-clear">C</button>
-   <button data-step="-">−</button>
-   <button data-step="+">+</button>
+   <button data-step="+">+</button><button data-n="0">0</button><button data-step="-">−</button>
+   <button data-back="1">⌫</button>
+   <button class="calc-clear">C</button>
       <select id="calcStep">
     <option value="1000">1.000</option>
     <option value="10000">10.000</option>
