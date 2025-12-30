@@ -1,11 +1,14 @@
-const CACHE_NAME = "daily-task-v7.3.0"; // 🔥 GANTI SETIAP UPDATE
+const VERSION = "7.3.0"; // 🔥 GANTI SETIAP UPDATE
+const CACHE_NAME = `daily-task-${VERSION}`;
 const BASE = "/daily-task/";
 
 const CORE_ASSETS = [
   BASE,
   BASE + "index.html",
   BASE + "manifest.json",
-  BASE + "service-worker.js"
+  BASE + "service-worker.js",
+  BASE + "icons/icon-192.png",
+  BASE + "icons/icon-512.png"
 ];
 
 /* ===== INSTALL ===== */
@@ -30,20 +33,21 @@ self.addEventListener("activate", event => {
  self.clients.claim();
 });
 
-/* ===== FETCH (Network First) ===== */
+/* ===== FETCH (Network First, SAFE) ===== */
 self.addEventListener("fetch", event => {
  const req = event.request;
 
  if (req.method !== "GET") return;
-
- // hanya handle request di folder app
- if (!req.url.includes("/daily-task/")) return;
+ if (!req.url.startsWith(self.location.origin)) return;
 
  event.respondWith(
   fetch(req)
    .then(res => {
-    const clone = res.clone();
-    caches.open(CACHE_NAME).then(c => c.put(req, clone));
+    // ⚠️ JANGAN cache HTML aggressively
+    if (res.ok && !req.headers.get("accept")?.includes("text/html")) {
+     const clone = res.clone();
+     caches.open(CACHE_NAME).then(c => c.put(req, clone));
+    }
     return res;
    })
    .catch(() =>
