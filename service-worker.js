@@ -1,4 +1,4 @@
-const VERSION = "7.3.1"; // 🔥 GANTI SETIAP UPDATE
+const VERSION = "7.3.2"; // 🔥 GANTI SETIAP UPDATE
 const CACHE_NAME = `daily-task-${VERSION}`;
 const BASE = "/daily-task/";
 
@@ -56,5 +56,6 @@ self.addEventListener("fetch", event => {
    )
  );
 });
+
 
 
