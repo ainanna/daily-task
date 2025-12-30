@@ -3,9 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/png" sizes="192x192" href="/daily-task/icons/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="/daily-task/icons/icon-512.png">
-<link rel="apple-touch-icon" href="/daily-task/icons/icon-192.png">
 <meta name="theme-color" content="#4fc3f7">
 <title>Daily Task</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -187,6 +184,63 @@ button.primary{background:var(--accent);color:#000}
  display:block;height:100%;
  background:linear-gradient(90deg,var(--ok),var(--accent));
 }
+.calc-modes label{
+ display:block;
+ font-size:12px;
+ margin:6px 0;
+ cursor:pointer;
+}
+
+.calc-input input{
+ width:100%;
+ padding:10px;
+ background:#0b1220;
+ border:1px solid #243056;
+ border-radius:8px;
+ color:var(--text);
+ font-size:15px;
+}
+
+.calc-result{
+ margin-top:10px;
+ font-size:12px;
+}
+
+.calc-result div{
+ display:flex;
+ justify-content:space-between;
+ padding:6px 0;
+ border-bottom:1px dashed #243056;
+}
+
+.calc-keypad{
+ display:grid;
+ grid-template-columns:repeat(3,1fr);
+ gap:6px;
+ margin-top:10px;
+}
+
+.calc-keypad button,
+.calc-keypad select{
+ background:#1c2748;
+ border:1px solid #243056;
+ color:var(--text);
+ padding:10px;
+ border-radius:8px;
+ font-weight:600;
+ cursor:pointer;
+}
+
+.calc-clear{
+ grid-column:span;
+ background:rgba(255,82,82,.25);
+ border-color:var(--danger);
+ color:var(--danger);
+}
+.calc-keypad button[data-back]{
+ grid-column: span;
+ background:#243056;
+}
 </style>
 </head>
 
@@ -197,6 +251,7 @@ button.primary{background:var(--accent);color:#000}
  <select id="accountSelect"></select>
  <button onclick="addAccount()">+ Account</button>
  <button onclick="addCharacter()" class="primary">+ Character</button>
+ <button onclick="openMarketCalc()">📊 Market Calc</button>
  <button onclick="openResetSettings()">⚙ Reset Settings</button>
  <button onclick="resetAllData()" 
  style="border:1px solid #ff5252;color:#ff5252">
@@ -767,7 +822,7 @@ async function applyUpdate(){
 }
 </script>
 <script>
-
+let marketCalcInited = false;
 if ("serviceWorker" in navigator) {
  navigator.serviceWorker.register("/daily-task/service-worker.js");
 
@@ -786,6 +841,118 @@ if ("serviceWorker" in navigator) {
   }
  });
 }
+function openMarketCalc(){
+ document.getElementById("marketCalcModal").style.display="flex";
+
+ if(!marketCalcInited){
+  initMarketCalc();
+  marketCalcInited = true;
+ }
+}
+function closeMarketCalc(){
+ document.getElementById("marketCalcModal").style.display="none";
+}
+function formatRupiah(num){
+ return num.toLocaleString("id-ID");
+}
+
+function parseRupiah(str){
+ return parseInt(str.replace(/[^\d]/g,"")) || 0;
+}
+function initMarketCalc(){
+ let STEP = 1000;
+ const amt = document.getElementById("calcAmount");
+
+ function calc(){
+  const raw = parseRupiah(amt.value);
+
+  // auto format input
+  if(amt.value){
+   amt.value = formatRupiah(raw);
+  }
+
+  if(!raw){
+   document.querySelector("#calcA b").textContent="-";
+   document.querySelector("#calcB b").textContent="-";
+   document.getElementById("calcDiff").textContent="-";
+   return;
+  }
+
+  const mode = document.querySelector('input[name="calcMode"]:checked').value;
+  let a,b,d;
+
+  if(mode==="gross"){
+   a = Math.floor(raw * 0.9);
+   b = Math.floor(raw * 0.8);
+   d = a - b;
+  }else{
+   a = Math.ceil(raw / 0.9);
+   b = Math.ceil(raw / 0.8);
+   d = b - a;
+  }
+
+  document.querySelector("#calcA b").textContent = formatRupiah(a);
+  document.querySelector("#calcB b").textContent = formatRupiah(b);
+  document.getElementById("calcDiff").textContent = formatRupiah(d);
+ }
+
+ amt.oninput = calc;
+
+// keypad angka (PATCH AMAN)
+document.querySelectorAll(".calc-keypad button[data-n]").forEach(b=>{
+ b.onclick = ()=>{
+  const current = parseRupiah(amt.value);   // ambil angka bersih
+  const digit   = parseInt(b.dataset.n);    // angka ditekan
+  const next    = current * 10 + digit;     // append numeric
+
+  amt.value = formatRupiah(next);
+  calc();
+ };
+});
+// tombol hapus 1 digit (BACKSPACE)
+document.querySelector(".calc-keypad button[data-back]").onclick = ()=>{
+ const current = parseRupiah(amt.value);
+
+ if(!current){
+  amt.value = "";
+ }else{
+  const next = Math.floor(current / 10);
+  amt.value = next ? formatRupiah(next) : "";
+ }
+
+ calc();
+};
+ // tombol +
+ document.querySelector("[data-step='+']").onclick = ()=>{
+  amt.value = formatRupiah(parseRupiah(amt.value) + STEP);
+  calc();
+ };
+
+ // tombol -
+ document.querySelector("[data-step='-']").onclick = ()=>{
+  amt.value = formatRupiah(
+   Math.max(0, parseRupiah(amt.value) - STEP)
+  );
+  calc();
+ };
+
+ // clear
+ document.querySelector(".calc-clear").onclick = ()=>{
+  amt.value = "";
+  calc();
+ };
+
+ // step
+ document.getElementById("calcStep").onchange = e=>{
+  STEP = parseInt(e.target.value);
+ };
+
+ // mode change
+ document.querySelectorAll("input[name='calcMode']").forEach(r=>{
+  r.onchange = calc;
+ });
+}
+
 </script>
 <div id="resetModal" style="display:none"></div>
 <div id="updatePopup" class="update-popup hidden">
@@ -795,6 +962,47 @@ if ("serviceWorker" in navigator) {
   <div class="update-actions">
    <button onclick="applyUpdate()">Update sekarang</button>
    <button class="ghost" onclick="hideUpdate()">Nanti</button>
+  </div>
+ </div>
+</div>
+<div id="marketCalcModal" class="modal-backdrop" style="display:none">
+ <div class="modal" onclick="event.stopPropagation()">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+   <h3>📊 Market Calculator</h3>
+   <button onclick="closeMarketCalc()" style="border:none;background:none;color:#ff5252;font-size:16px">✕</button>
+  </div>
+
+  <div class="calc-modes">
+   <label><input type="radio" name="calcMode" value="gross" checked>
+    Dari harga jual
+   </label>
+   <label><input type="radio" name="calcMode" value="net">
+    Dari target bersih
+   </label>
+  </div>
+
+  <div class="calc-input">
+   <input type="text" id="calcAmount" placeholder="Masukkan nominal">
+  </div>
+
+  <div class="calc-result">
+   <div id="calcA"><span>Market (10%)</span><b>-</b></div>
+   <div id="calcB"><span>World Market (20%)</span><b>-</b></div>
+   <div><span>Selisih</span><b id="calcDiff">-</b></div>
+  </div>
+
+  <div class="calc-keypad">
+   <button data-n="1">1</button><button data-n="2">2</button><button data-n="3">3</button>
+   <button data-n="4">4</button><button data-n="5">5</button><button data-n="6">6</button>
+   <button data-n="7">7</button><button data-n="8">8</button><button data-n="9">9</button>
+   <button data-step="+">+</button><button data-n="0">0</button><button data-step="-">−</button>
+   <button data-back="1">⌫</button>
+   <button class="calc-clear">C</button>
+      <select id="calcStep">
+    <option value="1000">1.000</option>
+    <option value="10000">10.000</option>
+    <option value="100000">100.000</option>
+   </select>
   </div>
  </div>
 </div>
