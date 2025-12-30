@@ -71,11 +71,22 @@
  border: 1px solid #333;
 }
 /* ===== MODAL RESET SETTINGS ===== */
+#taskModal,
+#resetModal,
+#marketCalcModal{
+ display:none;
+ position:fixed;
+ inset:0;
+ z-index:10000;
+}
+
 .modal-backdrop{
- position:fixed;inset:0;
+ position:fixed;
+ inset:0;
  background:rgba(0,0,0,.6);
- display:flex;align-items:center;justify-content:center;
- z-index:99;
+ display:flex;
+ align-items:center;
+ justify-content:center;
 }
 .modal{
  width:min(420px,95%);
@@ -251,6 +262,7 @@ button.primary{background:var(--accent);color:#000}
  <select id="accountSelect"></select>
  <button onclick="addAccount()">+ Account</button>
  <button onclick="addCharacter()" class="primary">+ Character</button>
+ <button onclick="openTaskManager()">📝 Manage Task</button>
  <button onclick="openMarketCalc()">📊 Market Calc</button>
  <button onclick="openResetSettings()">⚙ Reset Settings</button>
  <button onclick="resetAllData()" 
@@ -272,20 +284,25 @@ const RESET_HIGHLIGHT_MS=10*60*1000;
 
 let data=JSON.parse(localStorage.getItem(STORE))||{
  accounts:[],activeAccountId:null,
+  resetConfig:{
+  daily:{hour:4,minute:0},
+  weekly:{day:3,hour:4,minute:0},
+  shop:{day:0,hour:23,minute:0}
+ },
 tasks:[
- {id:"t1",name:"Nightmare",type:"daily",hour:4,minute:0},
- {id:"t2",name:"Daily Dungeon",type:"daily",hour:4,minute:0},
- {id:"t3",name:"Duty",type:"daily",hour:4,minute:0},
- {id:"t3a",name:"Shugo Festival",type:"daily",hour:4,minute:0,max:2},
- {id:"t4",name:"Raid",type:"weekly",day:3,hour:4,minute:0},
- {id:"t5",name:"Ascension Trial",type:"weekly",day:3,hour:4,minute:0},
- {id:"t6",name:"Weekly Scroll",type:"weekly",day:3,hour:4,minute:0},
- {id:"t7",name:"Abyss Scroll",type:"weekly",day:3,hour:4,minute:0},
-{id:"t8",name:"Arcanist",type:"weekly",day:3,hour:4,minute:0,max:5},
-{id:"t9",name:"Deus",type:"weekly",day:3,hour:4,minute:0,max:5},
- {id:"t10",name:"Odyle Craft",type:"weekly",day:3,hour:4,minute:0},
+ {id:"t1",name:"Nightmare",type:"daily",active:true,hour:4,minute:0},
+ {id:"t2",name:"Daily Dungeon",type:"daily",active:true,hour:4,minute:0},
+ {id:"t3",name:"Duty",type:"daily",active:true,hour:4,minute:0},
+ {id:"t3a",name:"Shugo Festival",type:"daily",active:true,hour:4,minute:0,max:2},
+ {id:"t4",name:"Raid",type:"weekly",active:true,day:3,hour:4,minute:0},
+ {id:"t5",name:"Ascension Trial",type:"weekly",active:true,day:3,hour:4,minute:0},
+ {id:"t6",name:"Weekly Scroll",type:"weekly",active:true,day:3,hour:4,minute:0},
+ {id:"t7",name:"Abyss Scroll",type:"weekly",active:true,day:3,hour:4,minute:0},
+{id:"t8",name:"Arcanist",type:"weekly",active:true,day:3,hour:4,minute:0,max:5},
+{id:"t9",name:"Deus",type:"weekly",active:true,day:3,hour:4,minute:0,max:5},
+ {id:"t10",name:"Odyle Craft",type:"weekly",active:true,day:3,hour:4,minute:0},
 
- {id:"t11",name:"Odyle Shop",type:"shop",day:0,hour:23,minute:0}
+ {id:"t11",name:"Odyle Shop",type:"shop",active:true,day:0,hour:23,minute:0}
 ]
 };
 
@@ -294,37 +311,42 @@ const now=()=>new Date();
 const active=()=>data.accounts.find(a=>a.id===data.activeAccountId);
 
 /* ================= RESET ENGINE ================= */
-function resetWindowId(t){
- const d = now();
- const r = new Date(d);
+function resetWindowId(type){
+ const d = new Date();
 
- // DAILY
- if(t.type === "daily"){
-  r.setHours(t.hour, t.minute || 0, 0, 0);
-  if(d < r) r.setDate(r.getDate() - 1);
-  return r.toDateString();
+ if(type === "daily"){
+  return d.toDateString();
  }
 
- // WEEKLY & SHOP
- if(t.type === "weekly" || t.type === "shop"){
-  const diff = (d.getDay() - t.day + 7) % 7;
-  r.setDate(d.getDate() - diff);
-  r.setHours(t.hour, t.minute || 0, 0, 0);
-  if(d < r) r.setDate(r.getDate() - 7);
-  return r.toDateString();
+ if(type === "weekly"){
+  const onejan = new Date(d.getFullYear(), 0, 1);
+  const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+  return d.getFullYear() + "-W" + week;
  }
+
+ if(type === "shop"){
+  return d.getFullYear() + "-" + (d.getMonth() + 1);
+ }
+
+ // 🔒 PATCH PENTING (ANTI undefined)
+ return d.toDateString();
 }
 
 function nextReset(t){
  const d=now(),r=new Date(d);
+
  if(t.type==="daily"){
-  r.setHours(t.hour, t.minute || 0, 0, 0);
+  const c=data.resetConfig.daily;
+  r.setHours(c.hour,c.minute,0,0);
   if(d>=r) r.setDate(r.getDate()+1);
   return r;
  }
- const diff=(t.day-d.getDay()+7)%7;
+
+const c=data.resetConfig[t.type] ?? data.resetConfig.daily;
+ if(!c) return new Date(Date.now() + 86400000);
+ const diff=(c.day-d.getDay()+7)%7;
  r.setDate(d.getDate()+diff);
- r.setHours(t.hour, t.minute || 0, 0, 0);
+ r.setHours(c.hour,c.minute,0,0);
  if(d>=r) r.setDate(r.getDate()+7);
  return r;
 }
@@ -334,7 +356,7 @@ function autoResetCheck(){
  data.accounts.forEach(acc=>{
   acc.characters.forEach(c=>{
    data.tasks.forEach(t=>{
-    const win = resetWindowId(t);
+    const win = resetWindowId(t.type);
     const p = c.progress[t.id];
     if(!p) return;
 
@@ -343,7 +365,7 @@ c.progress[t.id]={
  checked:false,
  count: t.max ? 0 : undefined,
  lastReset:win,
- resetAt:Date.now()
+ resetAt: c.progress[t.id]?.resetAt || Date.now()
 };
      changed=true;
     }
@@ -371,7 +393,7 @@ function formatHMS(ms){
 
 function sectionCountdown(type){
  let soonest=null;
- data.tasks.filter(t=>t.type===type).forEach(t=>{
+data.tasks.filter(t=>t.type===type && t.active!==false).forEach(t=>{
   const r=nextReset(t);
   if(!soonest||r<soonest) soonest=r;
  });
@@ -425,15 +447,18 @@ data.tasks.forEach(t => t.minute ??= 0);
   shop.innerHTML=`<div class="section-header"><h4>WEEKLY SHOP</h4><span class="countdown" data-type="shop"
 >${sectionCountdown("shop")}</span></div>`;
 
-data.tasks.forEach(t=>{
+data.tasks.filter(t=>t.active!==false).forEach(t=>{
  c.progress[t.id] ??= {
   checked:false,
   count: t.max ? 0 : undefined,
-  lastReset: resetWindowId(t),
+  lastReset: resetWindowId(t.type),
   resetAt: 0
 };
 
 // 🔥 MIGRATION SAFE
+if(!t.max && c.progress[t.id].count != null){
+ delete c.progress[t.id].count;
+}
 if(t.max && c.progress[t.id].count == null){
  c.progress[t.id].count = c.progress[t.id].checked ? t.max : 0;
 }
@@ -487,7 +512,10 @@ row.addEventListener("drop", e => {
  const fromId = e.dataTransfer.getData("text/plain");
  const toId   = row.dataset.taskId;
  if (fromId === toId) return;
+const fromTask = data.tasks.find(t=>t.id===fromId);
+const toTask   = data.tasks.find(t=>t.id===toId);
 
+if(fromTask.type !== toTask.type) return; // PATCH
  reorderTask(fromId, toId);
 });
    const label=document.createElement("label");
@@ -653,12 +681,13 @@ function resetAllData(){
 /* ================= RESET SETTINGS UI ================= */
 
 function openResetSettings(){
- const m=document.getElementById("resetModal");
- m.style.display="block";
+const m = document.getElementById("resetModal");
+if(!m) return;
+m.style.display = "flex";
 
- const daily=data.tasks.find(t=>t.type==="daily");
- const weekly=data.tasks.find(t=>t.type==="weekly");
- const shop=data.tasks.find(t=>t.type==="shop");
+const daily  = data.resetConfig.daily;
+const weekly = data.resetConfig.weekly;
+const shop   = data.resetConfig.shop;
 
  m.innerHTML=`
   <div class="modal-backdrop" onclick="closeResetSettings(event)">
@@ -728,23 +757,26 @@ function saveResetSettings(){
 
  const mode = document.querySelector('input[name="applyMode"]:checked')?.value || "next";
 
- // update task reset config
- data.tasks.forEach(t=>{
-  if(t.type==="daily"){
-   const [h,m]=dailyHourEl.value.split(":");
-   t.hour=+h; t.minute=+m;
-  }
-  if(t.type==="weekly"){
-   const [h,m]=weeklyHourEl.value.split(":");
-   t.day=+weeklyDayEl.value;
-   t.hour=+h; t.minute=+m;
-  }
-  if(t.type==="shop"){
-   const [h,m]=shopHourEl.value.split(":");
-   t.day=+shopDayEl.value;
-   t.hour=+h; t.minute=+m;
-  }
- });
+// ✅ UPDATE GLOBAL RESET CONFIG
+const [dh, dm] = dailyHourEl.value.split(":");
+data.resetConfig.daily = {
+ hour: +dh,
+ minute: +dm
+};
+
+const [wh, wm] = weeklyHourEl.value.split(":");
+data.resetConfig.weekly = {
+ day: +weeklyDayEl.value,
+ hour: +wh,
+ minute: +wm
+};
+
+const [sh, sm] = shopHourEl.value.split(":");
+data.resetConfig.shop = {
+ day: +shopDayEl.value,
+ hour: +sh,
+ minute: +sm
+};
 
  // 🧠 PRO LOGIC
  data.accounts.forEach(acc=>{
@@ -754,7 +786,7 @@ function saveResetSettings(){
 
 if(mode === "next"){
  // JANGAN reset checklist
- c.progress[t.id].lastReset = resetWindowId(t);
+ c.progress[t.id].lastReset = resetWindowId(t.type);
  c.progress[t.id].resetAt ??= 0;
 }
 
@@ -763,7 +795,7 @@ if(mode === "next"){
 c.progress[t.id]={
  checked:false,
  count: t.max ? 0 : undefined,
- lastReset: resetWindowId(t),
+ lastReset: resetWindowId(t.type),
  resetAt: Date.now()
 };
     }
@@ -777,12 +809,11 @@ c.progress[t.id]={
 }
 setInterval(()=>{
  document.querySelectorAll(".countdown").forEach(el=>{
-  const type = el.dataset.type;
-  el.textContent = sectionCountdown(type);
+  el.textContent = sectionCountdown(el.dataset.type);
  });
-
- autoResetCheck();
 },1000);
+
+setInterval(autoResetCheck, 30000);
 /* ================= INIT ================= */
 if(!data.accounts.length){
  const name = prompt("Masukkan nama Account:");
@@ -851,14 +882,23 @@ if ("serviceWorker" in navigator) {
  });
 }
 function openMarketCalc(){
- document.getElementById("marketCalcModal").style.display="flex";
+ const modal = document.getElementById("marketCalcModal");
+ if(!modal){
+  alert("marketCalcModal tidak ditemukan");
+  return;
+ }
+
+ modal.style.display="flex";
 
  if(!marketCalcInited){
-  initMarketCalc();
-  marketCalcInited = true;
+  setTimeout(() => {
+   initMarketCalc();
+   marketCalcInited = true;
+  }, 0);
  }
 }
-function closeMarketCalc(){
+function closeMarketCalc(e){
+ if(e && e.target !== e.currentTarget) return;
  document.getElementById("marketCalcModal").style.display="none";
 }
 function formatRupiah(num){
@@ -961,8 +1001,162 @@ document.querySelector(".calc-keypad button[data-back]").onclick = ()=>{
   r.onchange = calc;
  });
 }
+ // taskmanager
+function openTaskManager(){
+ const m=document.getElementById("taskModal");
+ if(!m) return;
+m.style.display="flex";
+
+ m.innerHTML=`
+ <div class="modal-backdrop" onclick="closeTaskManager(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+   <h3>📝 Task Manager</h3>
+
+   <button class="primary" onclick="openTaskForm()">+ Add Task</button>
+
+   <div style="margin-top:10px">
+    ${data.tasks.map(t=>`
+     <div class="task">
+      <label>
+       <input type="checkbox" ${t.active!==false?"checked":""}
+        onchange="toggleTaskActive('${t.id}',this.checked)">
+${t.name}
+<small>
+ (${t.type}${t.max ? ` · max ${t.max}` : ""})
+</small>
+      </label>
+
+      <button onclick="editTask('${t.id}')">✏️</button>
+      <button onclick="deleteTask('${t.id}')" style="color:#ff5252">🗑</button>
+     </div>
+    `).join("")}
+   </div>
+
+   <div class="modal-footer">
+    <button onclick="closeTaskManager()">Close</button>
+   </div>
+  </div>
+ </div>`;
+}
+
+function closeTaskManager(e){
+ if(e && e.target!==e.currentTarget) return;
+ document.getElementById("taskModal").style.display="none";
+}
+
+function toggleTaskActive(id,val){
+ const t=data.tasks.find(t=>t.id===id);
+ if(!t)return;
+ t.active=val;
+ save();render();
+}
+function openTaskForm(task=null){
+ const m=document.getElementById("taskModal");
+ const edit=!!task;
+
+ m.innerHTML=`
+ <div class="modal-backdrop">
+  <div class="modal">
+   <h3>${edit?"Edit":"Add"} Task</h3>
+
+   <div class="form-row">
+    <label>Nama Task</label>
+    <input id="taskName" value="${task?.name||""}">
+   </div>
+
+   <div class="form-row">
+    <label>Kategori</label>
+    <select id="taskType">
+     ${["daily","weekly","shop"].map(t=>
+      `<option ${task?.type===t?"selected":""}>${t}</option>`
+     ).join("")}
+    </select>
+   </div>
+
+   <div class="form-row">
+    <label>Max Count (opsional)</label>
+    <input id="taskMax" type="number" min="0" placeholder="contoh: 5"
+     value="${task?.max ?? ""}">
+   </div>
+
+   <small style="font-size:11px;opacity:.7">
+    Kosong / 0 = task checklist biasa<br>
+    > 0 = task pakai counter
+   </small>
+
+   <div class="modal-footer">
+    <button onclick="openTaskManager()">Cancel</button>
+    <button class="primary" onclick="saveTask('${task?.id||""}')">
+     Save
+    </button>
+   </div>
+  </div>
+ </div>`;
+}
+
+function saveTask(id){
+ const name = document.getElementById("taskName").value.trim();
+ const type = document.getElementById("taskType").value;
+ const maxVal = parseInt(document.getElementById("taskMax").value);
+
+ if(!name) return alert("Nama kosong");
+
+ const max = maxVal > 0 ? maxVal : undefined;
+
+ if(id){
+  // EDIT
+  const t = data.tasks.find(t => t.id === id);
+  if(!t) return;
+
+  t.name = name;
+  t.type = type;
+  t.max  = max;
+
+ }else{
+  // ADD BARU
+  const cfg = data.resetConfig[type] ?? {};
+
+  data.tasks.push({
+   id: "t" + Date.now(),
+   name,
+   type,
+   max,
+   active: true,
+
+   day: type !== "daily" ? cfg.day : undefined,
+   hour: cfg.hour ?? 4,
+   minute: cfg.minute ?? 0
+  });
+ }
+
+ save();
+ openTaskManager();
+ render();
+}
+
+function editTask(id){
+ const t=data.tasks.find(t=>t.id===id);
+ if(t)openTaskForm(t);
+}
+
+function deleteTask(id){
+ if(!confirm("Hapus task ini?"))return;
+
+ data.tasks=data.tasks.filter(t=>t.id!==id);
+
+ data.accounts.forEach(a=>{
+  a.characters.forEach(c=>{
+   delete c.progress[id];
+  });
+ });
+
+ save();
+ openTaskManager();
+ render();
+}
 
 </script>
+<div id="taskModal" style="display:none"></div>
 <div id="resetModal" style="display:none"></div>
 <div id="updatePopup" class="update-popup hidden">
  <div class="update-card">
@@ -974,12 +1168,14 @@ document.querySelector(".calc-keypad button[data-back]").onclick = ()=>{
   </div>
  </div>
 </div>
-<div id="marketCalcModal" class="modal-backdrop" style="display:none">
- <div class="modal" onclick="event.stopPropagation()">
-  <div style="display:flex;justify-content:space-between;align-items:center">
-   <h3>📊 Market Calculator</h3>
-   <button onclick="closeMarketCalc()" style="border:none;background:none;color:#ff5252;font-size:16px">✕</button>
-  </div>
+<div id="marketCalcModal" style="display:none">
+ <div class="modal-backdrop" onclick="closeMarketCalc(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+   <div style="display:flex;justify-content:space-between;align-items:center">
+    <h3>📊 Market Calculator</h3>
+    <button onclick="closeMarketCalc()"
+     style="border:none;background:none;color:#ff5252;font-size:16px">✕</button>
+   </div>
 
   <div class="calc-modes">
    <label><input type="radio" name="calcMode" value="gross" checked>
