@@ -1,5 +1,5 @@
 {
-  "name": "Aion 2 Daily Task 7.3",
+  "name": "Aion 2 Daily Task 7.3.1",
   "short_name": "Aion2 Tracker",
   "start_url": "/daily-task/",
   "scope": "/daily-task/",
@@ -19,4 +19,5 @@
     }
   ]
 }
+
 
