@@ -605,8 +605,10 @@ row.classList.remove("reset-soon");
    label.append(cb,t.name);
    row.append(label);
 
-   const diff=nextReset(t)-now();
-   if(diff>0&&diff<3600000)row.classList.add("reset-soon");
+const diff = nextReset(t) - now();
+if(diff > 0 && diff < 3600000 && !c.progress[t.id].checked){
+ row.classList.add("reset-soon");
+}
    if(Date.now()-c.progress[t.id].resetAt<RESET_HIGHLIGHT_MS&&!c.progress[t.id].checked)
     row.classList.add("reset-now");
 if(t.max){
