@@ -255,6 +255,9 @@ button.primary{background:var(--accent);color:#000}
 .char-header button{
  cursor:pointer;
 }
+.task:focus-within{
+ box-shadow: 0 0 0 1px var(--accent);
+}
 </style>
 </head>
 
@@ -1054,9 +1057,36 @@ function updateExpandAllBtn(){
 }
  // taskmanager
 function openTaskManager(){
- const m=document.getElementById("taskModal");
+ const m = document.getElementById("taskModal");
  if(!m) return;
-m.style.display="flex";
+ m.style.display="flex";
+
+ // helper render list task
+ const renderList = (type, title, color) => {
+  const list = data.tasks.filter(t => t.type === type);
+  if(!list.length) return "";
+
+  return `
+   <h4 style="margin:12px 0 6px;color:${color}">
+    ${title}
+   </h4>
+   ${list.map(t=>`
+    <div class="task">
+     <label>
+      <input type="checkbox" ${t.active!==false?"checked":""}
+       onchange="toggleTaskActive('${t.id}',this.checked)">
+      ${t.name}
+      <small>
+       (${t.type}${t.max ? ` · max ${t.max}` : ""})
+      </small>
+     </label>
+
+     <button onclick="editTask('${t.id}')">✏️</button>
+     <button onclick="deleteTask('${t.id}')" style="color:#ff5252">🗑</button>
+    </div>
+   `).join("")}
+  `;
+ };
 
  m.innerHTML=`
  <div class="modal-backdrop" onclick="closeTaskManager(event)">
@@ -1066,21 +1096,9 @@ m.style.display="flex";
    <button class="primary" onclick="openTaskForm()">+ Add Task</button>
 
    <div style="margin-top:10px">
-    ${data.tasks.map(t=>`
-     <div class="task">
-      <label>
-       <input type="checkbox" ${t.active!==false?"checked":""}
-        onchange="toggleTaskActive('${t.id}',this.checked)">
-${t.name}
-<small>
- (${t.type}${t.max ? ` · max ${t.max}` : ""})
-</small>
-      </label>
-
-      <button onclick="editTask('${t.id}')">✏️</button>
-      <button onclick="deleteTask('${t.id}')" style="color:#ff5252">🗑</button>
-     </div>
-    `).join("")}
+    ${renderList("daily","DAILY","var(--accent)")}
+    ${renderList("weekly","WEEKLY","var(--weeklyAccent)")}
+    ${renderList("shop","WEEKLY SHOP","var(--shopAccent)")}
    </div>
 
    <div class="modal-footer">
