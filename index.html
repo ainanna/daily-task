@@ -389,14 +389,16 @@ c.progress[t.id]={
 
 /* ================= TIME FORMAT ================= */
 function formatHMS(ms){
- if(ms<=0) return "RESET";
- const s=Math.floor(ms/1000);
- const d=Math.floor(s/86400);
- const h=Math.floor((s%86400)/3600);
- const m=Math.floor((s%3600)/60);
- const sec=s%60;
- if(d>0) return `${d}d ${h}h ${m}m`;
- return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
+ if(ms <= 0) return "RESET";
+
+ const totalMin = Math.ceil(ms / 60000); // ⬅ PENTING
+ const d = Math.floor(totalMin / 1440);
+ const h = Math.floor((totalMin % 1440) / 60);
+ const m = totalMin % 60;
+
+ if(d > 0) return `${d}d ${h}h ${m}m`;
+ if(h > 0) return `${h}h ${m}m`;
+ return `${m}m`;
 }
 
 function sectionCountdown(type){
@@ -918,13 +920,16 @@ c.progress[t.id]={
  render();
 }
 setInterval(()=>{
+ // update countdown (jam:menit)
+  if (document.hidden) return;
  document.querySelectorAll(".countdown").forEach(el=>{
-  const type = el.dataset.type;
-  el.textContent = sectionCountdown(type);
+  el.textContent = sectionCountdown(el.dataset.type);
  });
 
+ // cek reset (aman walau jarang)
  autoResetCheck();
-},1000);
+
+},60000); // ⬅ 30 detik
 // 🔥 CLICK HEADER TO COLLAPSE / EXPAND
 document.addEventListener("click", e => {
  const header = e.target.closest(".char-header");
@@ -937,6 +942,13 @@ document.addEventListener("click", e => {
  if (!charId) return;
 
  toggleChar(charId);
+});
+// 🔥 WAKE UP SAAT TAB AKTIF LAGI
+document.addEventListener("visibilitychange", ()=>{
+ if(!document.hidden){
+  autoResetCheck();
+  render();
+ }
 });
 /* ================= INIT ================= */
 if(!data.accounts.length){
@@ -951,6 +963,8 @@ name: name && name.trim() ? name.trim() : "Default",
  data.activeAccountId = data.accounts[0].id;
  save();
 }
+// 🔥 cek reset SEKALI saat app dibuka
+setTimeout(autoResetCheck, 0);
 render();
 async function forceUpdatePWA(){
  if(!confirm("Force update aplikasi?")) return;
