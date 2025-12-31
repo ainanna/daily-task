@@ -130,10 +130,11 @@ button.primary{background:var(--accent);color:#000}
 
 .grid{
  display:grid;
+ align-items:start;
  grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
  gap:14px;padding:14px
 }
-.card{background:var(--card);border-radius:14px;padding:12px}
+.card{background:var(--card);border-radius:14px;padding:12px;transition: all .25s ease;}
 
 .char-header{
  display:flex;justify-content:space-between;align-items:center
@@ -241,26 +242,19 @@ button.primary{background:var(--accent);color:#000}
  grid-column: span;
  background:#243056;
 }
+.card.collapsed{
+ padding:10px;
+}
+
+.card.collapsed .char-content{
+ display:none;
+}
 </style>
 </head>
 
 <body>
 
-<header>
- <b>Daily Task</b>
- <select id="accountSelect"></select>
- <button onclick="addAccount()">+ Account</button>
- <button onclick="addCharacter()" class="primary">+ Character</button>
- <button onclick="openMarketCalc()">📊 Market Calc</button>
- <button onclick="openResetSettings()">⚙ Reset Settings</button>
- <button onclick="resetAllData()" 
- style="border:1px solid #ff5252;color:#ff5252">
- Reset Data
-</button>
-<button onclick="forceUpdatePWA()"
- style="border:1px solid #ff9800;color:#ff9800">
- 🔄 Force Update
-</button>
+<header id="mainHeader">
 </header>
 
 <div id="app" class="grid"></div>
@@ -272,30 +266,56 @@ const RESET_HIGHLIGHT_MS=10*60*1000;
 
 let data=JSON.parse(localStorage.getItem(STORE))||{
  accounts:[],activeAccountId:null,
+ focusMode: false, // 🔥 SMART FOCUS DEFAULT ON
 tasks:[
- {id:"t1",name:"Nightmare",type:"daily",hour:4,minute:0},
- {id:"t2",name:"Daily Dungeon",type:"daily",hour:4,minute:0},
- {id:"t3",name:"Duty",type:"daily",hour:4,minute:0},
- {id:"t3a",name:"Shugo Festival",type:"daily",hour:4,minute:0,max:2},
- {id:"t4",name:"Raid",type:"weekly",day:3,hour:4,minute:0},
- {id:"t5",name:"Ascension Trial",type:"weekly",day:3,hour:4,minute:0},
- {id:"t6",name:"Weekly Scroll",type:"weekly",day:3,hour:4,minute:0},
- {id:"t7",name:"Abyss Scroll",type:"weekly",day:3,hour:4,minute:0},
-{id:"t8",name:"Arcanist",type:"weekly",day:3,hour:4,minute:0,max:5},
-{id:"t9",name:"Deus",type:"weekly",day:3,hour:4,minute:0,max:5},
- {id:"t10",name:"Odyle Craft",type:"weekly",day:3,hour:4,minute:0},
+ {id:"t1",name:"Nightmare",type:"daily",active:true,hour:4,minute:0},
+ {id:"t2",name:"Daily Dungeon",type:"daily",active:true,hour:4,minute:0},
+ {id:"t3",name:"Duty",type:"daily",active:true,hour:4,minute:0},
+ {id:"t3a",name:"Shugo Festival",type:"daily",active:true,hour:4,minute:0,max:2},
+ {id:"t4",name:"Raid",type:"weekly",active:true,day:3,hour:4,minute:0},
+ {id:"t5",name:"Ascension Trial",type:"weekly",active:true,day:3,hour:4,minute:0},
+ {id:"t6",name:"Weekly Scroll",type:"weekly",active:true,day:3,hour:4,minute:0},
+ {id:"t7",name:"Abyss Scroll",type:"weekly",active:true,day:3,hour:4,minute:0},
+{id:"t8",name:"Arcanist",type:"weekly",active:true,day:3,hour:4,minute:0,max:5},
+{id:"t9",name:"Deus",type:"weekly",active:true,day:3,hour:4,minute:0,max:5},
+ {id:"t10",name:"Odyle Craft",type:"weekly",active:true,day:3,hour:4,minute:0},
 
- {id:"t11",name:"Odyle Shop",type:"shop",day:0,hour:23,minute:0}
+ {id:"t11",name:"Odyle Shop",type:"shop",active:true,day:0,hour:23,minute:0}
 ]
 };
 
 const save=()=>localStorage.setItem(STORE,JSON.stringify(data));
+// 🔧 PATCH MIGRATION TASK (AMAN)
+// 🔥 PATCH MIGRATION 
+data.accounts?.forEach(acc=>{
+ acc.characters?.forEach(c=>{
+  Object.entries(c.progress || {}).forEach(([taskId,p])=>{
+   const t = data.tasks.find(t=>t.id===taskId);
+   if(!t) return;
+
+   // kalau lastReset belum pakai minute → sejajarkan
+   const win = resetWindowId(t);
+
+   if(p.lastReset && p.lastReset !== win){
+    // JANGAN reset checklist lama
+    p.lastReset = win;
+    p.resetAt ??= 0;
+   }
+
+   // sync counter lama
+   if(t.max && p.count == null){
+    p.count = p.checked ? t.max : 0;
+   }
+  });
+ });
+});
+save();
 const now=()=>new Date();
 const active=()=>data.accounts.find(a=>a.id===data.activeAccountId);
 
 /* ================= RESET ENGINE ================= */
 function resetWindowId(t){
- const d = now();
+ const d = new Date();
  const r = new Date(d);
 
  // DAILY
@@ -313,6 +333,7 @@ function resetWindowId(t){
   if(d < r) r.setDate(r.getDate() - 7);
   return r.toDateString();
  }
+ return "";
 }
 
 function nextReset(t){
@@ -338,7 +359,7 @@ function autoResetCheck(){
     const p = c.progress[t.id];
     if(!p) return;
 
-    if(p.lastReset !== win){
+if(p.lastReset && p.lastReset !== win){
 c.progress[t.id]={
  checked:false,
  count: t.max ? 0 : undefined,
@@ -371,17 +392,57 @@ function formatHMS(ms){
 
 function sectionCountdown(type){
  let soonest=null;
- data.tasks.filter(t=>t.type===type).forEach(t=>{
+ data.tasks
+ .filter(t => t.type===type && t.active!==false) // 🔥 PATCH
+ .forEach(t=>{
   const r=nextReset(t);
   if(!soonest||r<soonest) soonest=r;
  });
  return soonest?formatHMS(soonest-now()):"";
 }
+function renderHeader(){
+ const h = document.getElementById("mainHeader");
+ if(!h) return;
 
+ h.innerHTML = `
+  <b>Daily Task</b>
+
+  <select id="accountSelect"></select>
+
+  <button onclick="addAccount()">+ Account</button>
+  <button onclick="addCharacter()" class="primary">+ Character</button>
+  <button onclick="openTaskManager()">📝 Manage Task</button>
+  <button onclick="openMarketCalc()">📊 Market Calc</button>
+
+<button onclick="toggleFocusMode()"
+ style="
+  border-color:${data.focusMode ? 'var(--ok)' : '#555'};
+  color:${data.focusMode ? 'var(--ok)' : 'var(--text)'};
+ ">
+ 🧠 Focus: <b>${data.focusMode ? "ON" : "OFF"}</b>
+</button>
+<button onclick="toggleExpandAll()" id="expandAllBtn">
+ 🔽 Expand All
+</button>
+  <button onclick="openResetSettings()">⚙ Reset Settings</button>
+
+  <button onclick="resetAllData()"
+   style="border:1px solid #ff5252;color:#ff5252">
+   Reset Data
+  </button>
+
+  <button onclick="forceUpdatePWA()"
+   style="border:1px solid #ff9800;color:#ff9800">
+   🔄 Force Update
+  </button>
+ `;
+}
 /* ================= RENDER ================= */
-const accountSelect = document.getElementById("accountSelect");
 const app = document.getElementById("app");
 function render(){
+   renderHeader();
+    const accountSelect = document.getElementById("accountSelect");
+ if(!accountSelect) return;
 data.tasks.forEach(t => t.minute ??= 0);
  accountSelect.innerHTML="";
  data.accounts.forEach(a=>accountSelect.append(new Option(a.name,a.id)));
@@ -394,23 +455,45 @@ data.tasks.forEach(t => t.minute ??= 0);
  const acc=active(); if(!acc)return;
 
  acc.characters.forEach(c=>{
+  // 🔥 PATCH MIGRATION (character lama)
+if(c.collapsed === undefined){
+ c.collapsed = false;
+}
   let dDone=0,dTotal=0,wDone=0,wTotal=0,sDone=0,sTotal=0;
 
   const card=document.createElement("div");
   card.className="card";
   card.innerHTML=`
-   <div class="char-header">
-    <b>${c.name}</b>
-    <button onclick="deleteCharacter('${c.id}')" style="
+ <div class="char-header">
+  <b>${c.name}</b>
+
+  <div style="display:flex;gap:6px;align-items:center">
+   <button onclick="toggleChar('${c.id}')"
+    style="
+     background:transparent;
+     border:1px solid #243056;
+     color:var(--text);
+     border-radius:6px;
+     padding:2px 6px;
+     cursor:pointer
+    ">
+    ${c.collapsed ? "▶" : "▼"}
+   </button>
+
+   <button onclick="deleteCharacter('${c.id}')"
+    style="
      background:transparent;
      border:1px solid #ff5252;
      color:#ff5252;
      border-radius:6px;
      padding:2px 6px;
      cursor:pointer
-    ">🗑</button>
-   </div>
-  `;
+    ">
+    🗑
+   </button>
+  </div>
+ </div>
+`;
 
   const daily=document.createElement("div");
   daily.className="section daily";
@@ -425,7 +508,7 @@ data.tasks.forEach(t => t.minute ??= 0);
   shop.innerHTML=`<div class="section-header"><h4>WEEKLY SHOP</h4><span class="countdown" data-type="shop"
 >${sectionCountdown("shop")}</span></div>`;
 
-data.tasks.forEach(t=>{
+data.tasks.filter(t => t.active !== false).forEach(t=>{
  c.progress[t.id] ??= {
   checked:false,
   count: t.max ? 0 : undefined,
@@ -496,7 +579,8 @@ row.addEventListener("drop", e => {
    cb.checked=c.progress[t.id].checked;
 cb.onchange = () => {
  c.progress[t.id].checked = cb.checked;
-
+row.classList.remove("reset-now");
+row.classList.remove("reset-soon");
  if (t.max) {
   c.progress[t.id].count = cb.checked ? t.max : 0;
 
@@ -520,30 +604,48 @@ cb.onchange = () => {
    if(Date.now()-c.progress[t.id].resetAt<RESET_HIGHLIGHT_MS&&!c.progress[t.id].checked)
     row.classList.add("reset-now");
 if(t.max){
- const counter=document.createElement("div");
+ const counter = document.createElement("div");
  counter.style.display="flex";
  counter.style.gap="6px";
  counter.style.alignItems="center";
 
- const minus=document.createElement("button");
+ const minus = document.createElement("button");
  minus.textContent="−";
 
- const plus=document.createElement("button");
+ const plus = document.createElement("button");
  plus.textContent="+";
 
- const text=document.createElement("span");
- text.textContent=`${c.progress[t.id].count}/${t.max}`;
+ const text = document.createElement("span");
+ text.textContent = `${c.progress[t.id].count}/${t.max}`;
 
- minus.onclick=()=>{
-  c.progress[t.id].count=Math.max(0,c.progress[t.id].count-1);
-  c.progress[t.id].checked=c.progress[t.id].count===t.max;
-  save(); render();
+ // 🔥 helper update UI
+ function syncUI(){
+  text.textContent = `${c.progress[t.id].count}/${t.max}`;
+  cb.checked = c.progress[t.id].count === t.max;
+ }
+
+ minus.onclick = ()=>{
+  const p = c.progress[t.id];
+  if(p.count <= 0) return;
+
+  p.count--;
+  p.checked = p.count === t.max;
+
+  syncUI();
+  save();
+  updateProgress(card, c); // ✅ update bar aja
  };
 
- plus.onclick=()=>{
-  c.progress[t.id].count=Math.min(t.max,c.progress[t.id].count+1);
-  c.progress[t.id].checked=c.progress[t.id].count===t.max;
-  save(); render();
+ plus.onclick = ()=>{
+  const p = c.progress[t.id];
+  if(p.count >= t.max) return;
+
+  p.count++;
+  p.checked = p.count === t.max;
+
+  syncUI();
+  save();
+  updateProgress(card, c); // ✅ update bar aja
  };
 
  counter.append(minus,text,plus);
@@ -552,15 +654,26 @@ if(t.max){
    sec.append(row);
   });
 
-card.append(
+// 🔽 WRAP CONTENT CHARACTER (COLLAPSE SUPPORT)
+const content = document.createElement("div");
+content.className = "char-content";
+
+if(c.collapsed){
+ card.classList.add("collapsed");
+}else{
+ card.classList.remove("collapsed");
+}
+
+content.append(
  daily,progressBar("daily",dDone,dTotal),
  weekly,progressBar("weekly",wDone,wTotal),
  shop,progressBar("shop",sDone,sTotal)
 );
 
-  app.append(card);
+card.append(content);
+app.append(card);
  });
-
+updateExpandAllBtn();
 }
 function reorderTask(fromId, toId){
  const fromIndex = data.tasks.findIndex(t => t.id === fromId);
@@ -591,13 +704,15 @@ function updateProgress(card, character){
   shop:{done:0,total:0}
  };
 
-data.tasks.forEach(t=>{
- const p = character.progress[t.id];
- if(!p || !sections[t.type]) return;
+data.tasks
+ .filter(t => t.active !== false) // 🔥 PATCH
+ .forEach(t=>{
+  const p = character.progress[t.id];
+  if(!p || !sections[t.type]) return;
 
- sections[t.type].total++;
- if(p.checked) sections[t.type].done++;
-});
+  sections[t.type].total++;
+  if(p.checked) sections[t.type].done++;
+ });
 
  Object.entries(sections).forEach(([type,v])=>{
   const wrap = card.querySelector(`.progress-${type}`);
@@ -632,11 +747,30 @@ function addCharacter(){
  const a=active(); if(!a)return;
  const n=prompt("Nama Character");
  if(n){
-  a.characters.push({id:"c"+Date.now(),name:n,progress:{}});
+  a.characters.push({
+   id:"c"+Date.now(),
+   name:n,
+   progress:{},
+   collapsed:false   // ⬅ PATCH
+  });
   save();render();
  }
 }
+function toggleChar(charId){
+ const acc = active();
+ if(!acc) return;
 
+ acc.characters.forEach(c=>{
+  if(c.id === charId){
+   c.collapsed = !c.collapsed; // ✅ TOGGLE
+  }else if(data.focusMode){
+   c.collapsed = true;
+  }
+ });
+
+ save();
+ render();
+}
 function deleteCharacter(charId){
  const acc=active(); if(!acc)return;
  const char=acc.characters.find(c=>c.id===charId);
@@ -829,6 +963,229 @@ async function applyUpdate(){
  }
  location.reload();
 }
+function expandAllChars(){
+ const acc = active();
+ if(!acc.characters.length){
+ alert("Belum ada character 😅");
+ return;
+}
+ // 🔥 matikan focus mode biar gak auto collapse lagi
+ data.focusMode = false;
+
+ acc.characters.forEach(c=>{
+  c.collapsed = false;
+ });
+
+ save();
+ render();
+}
+function collapseAllChars(){
+ const acc = active();
+ if(!acc) return;
+if(!acc.characters.length){
+ alert("Belum ada character 😅");
+ return;
+}
+ acc.characters.forEach(c=>{
+  c.collapsed = true;
+ });
+
+ save();
+ render();
+}
+function toggleExpandAll(){
+ const acc = active();
+ if(!acc) return;
+
+ // kalau belum ada character → stop
+ if(!acc.characters.length) return;
+
+ // cek: apakah semua sudah terbuka?
+ const allExpanded = acc.characters.every(c => !c.collapsed);
+
+ if(allExpanded){
+  // 🔼 COLLAPSE ALL
+  acc.characters.forEach(c=>{
+   c.collapsed = true;
+  });
+ }else{
+  // 🔽 EXPAND ALL
+  data.focusMode = false; // matikan Smart Focus biar gak konflik
+  acc.characters.forEach(c=>{
+   c.collapsed = false;
+  });
+ }
+
+ save();
+ render();
+}
+function updateExpandAllBtn(){
+ const acc = active();
+ const btn = document.getElementById("expandAllBtn");
+
+ if(!btn || !acc || !acc.characters.length) return;
+
+ const allExpanded = acc.characters.every(c => !c.collapsed);
+
+ btn.innerHTML = allExpanded
+  ? "🔼 Collapse All"
+  : "🔽 Expand All";
+}
+ // taskmanager
+function openTaskManager(){
+ const m=document.getElementById("taskModal");
+ if(!m) return;
+m.style.display="flex";
+
+ m.innerHTML=`
+ <div class="modal-backdrop" onclick="closeTaskManager(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+   <h3>📝 Task Manager</h3>
+
+   <button class="primary" onclick="openTaskForm()">+ Add Task</button>
+
+   <div style="margin-top:10px">
+    ${data.tasks.map(t=>`
+     <div class="task">
+      <label>
+       <input type="checkbox" ${t.active!==false?"checked":""}
+        onchange="toggleTaskActive('${t.id}',this.checked)">
+${t.name}
+<small>
+ (${t.type}${t.max ? ` · max ${t.max}` : ""})
+</small>
+      </label>
+
+      <button onclick="editTask('${t.id}')">✏️</button>
+      <button onclick="deleteTask('${t.id}')" style="color:#ff5252">🗑</button>
+     </div>
+    `).join("")}
+   </div>
+
+   <div class="modal-footer">
+    <button onclick="closeTaskManager()">Close</button>
+   </div>
+  </div>
+ </div>`;
+}
+
+function closeTaskManager(e){
+ if(e && e.target!==e.currentTarget) return;
+ document.getElementById("taskModal").style.display="none";
+}
+
+function toggleTaskActive(id,val){
+ const t=data.tasks.find(t=>t.id===id);
+ if(!t)return;
+ t.active=val;
+ save();render();
+}
+function openTaskForm(task=null){
+ const m=document.getElementById("taskModal");
+ const edit=!!task;
+
+ m.innerHTML=`
+ <div class="modal-backdrop">
+  <div class="modal">
+   <h3>${edit?"Edit":"Add"} Task</h3>
+
+   <div class="form-row">
+    <label>Nama Task</label>
+    <input id="taskName" value="${task?.name||""}">
+   </div>
+
+   <div class="form-row">
+    <label>Kategori</label>
+    <select id="taskType">
+     ${["daily","weekly","shop"].map(t=>
+      `<option ${task?.type===t?"selected":""}>${t}</option>`
+     ).join("")}
+    </select>
+   </div>
+
+   <div class="form-row">
+    <label>Max Count (opsional)</label>
+    <input id="taskMax" type="number" min="0" placeholder="contoh: 5"
+     value="${task?.max ?? ""}">
+   </div>
+
+   <small style="font-size:11px;opacity:.7">
+    Kosong / 0 = task checklist biasa<br>
+    > 0 = task pakai counter
+   </small>
+
+   <div class="modal-footer">
+    <button onclick="openTaskManager()">Cancel</button>
+    <button class="primary" onclick="saveTask('${task?.id||""}')">
+     Save
+    </button>
+   </div>
+  </div>
+ </div>`;
+}
+
+function saveTask(id){
+ const name = document.getElementById("taskName").value.trim();
+ const type = document.getElementById("taskType").value;
+ const maxVal = parseInt(document.getElementById("taskMax").value);
+
+ if(!name) return alert("Nama kosong");
+
+ const max = maxVal > 0 ? maxVal : undefined;
+
+ if(id){
+  // EDIT
+  const t = data.tasks.find(t => t.id === id);
+  if(!t) return;
+
+  t.name = name;
+  t.type = type;
+  t.max  = max;
+
+ }else{
+  // ADD BARU
+  data.resetConfig ??= {};     
+  const cfg = data.resetConfig[type] ?? {};
+
+  data.tasks.push({
+   id: "t" + Date.now(),
+   name,
+   type,
+   max,
+   active: true,
+
+   day: type !== "daily" ? cfg.day : undefined,
+   hour: cfg.hour ?? 4,
+   minute: cfg.minute ?? 0
+  });
+ }
+
+ save();
+ openTaskManager();
+ render();
+}
+
+function editTask(id){
+ const t=data.tasks.find(t=>t.id===id);
+ if(t)openTaskForm(t);
+}
+
+function deleteTask(id){
+ if(!confirm("Hapus task ini?"))return;
+
+ data.tasks=data.tasks.filter(t=>t.id!==id);
+
+ data.accounts.forEach(a=>{
+  a.characters.forEach(c=>{
+   delete c.progress[id];
+  });
+ });
+
+ save();
+ openTaskManager();
+ render();
+}
+
 </script>
 <script>
 let marketCalcInited = false;
@@ -961,9 +1318,14 @@ document.querySelector(".calc-keypad button[data-back]").onclick = ()=>{
   r.onchange = calc;
  });
 }
-
+function toggleFocusMode(){
+ data.focusMode = !data.focusMode;
+ save();
+ render();
+}
 </script>
 <div id="resetModal" style="display:none"></div>
+<div id="taskModal" style="display:none"></div>
 <div id="updatePopup" class="update-popup hidden">
  <div class="update-card">
   <h3>Update tersedia 🚀</h3>
@@ -1015,5 +1377,6 @@ document.querySelector(".calc-keypad button[data-back]").onclick = ()=>{
   </div>
  </div>
 </div>
+
 </body>
 </html>
