@@ -440,10 +440,7 @@ function renderHeader(){
    Reset Data
   </button>
 
-  <button onclick="forceUpdatePWA()"
-   style="border:1px solid #ff9800;color:#ff9800">
-   🔄 Force Update
-  </button>
+
  `;
 }
 /* ================= RENDER ================= */
@@ -1231,20 +1228,19 @@ let marketCalcInited = false;
 if ("serviceWorker" in navigator) {
  navigator.serviceWorker.register("/daily-task/service-worker.js");
 
- navigator.serviceWorker.addEventListener("controllerchange", () => {
-  location.reload();
- });
-
  navigator.serviceWorker.addEventListener("message", event => {
-  if (event.data?.type === "UPDATE_READY") {
-   const last = localStorage.getItem("app_version");
+ if (event.data?.type === "UPDATE_READY") {
 
-   if (last !== event.data.version) {
-    showUpdatePopup();
-    localStorage.setItem("app_version", event.data.version);
-   }
+  const last = localStorage.getItem("app_version");
+
+  if (last !== event.data.version) {
+   localStorage.setItem("app_version", event.data.version);
+
+   // 🔥 AUTO APPLY UPDATE
+   applyUpdate();
   }
- });
+ }
+});
 }
 function openMarketCalc(){
  document.getElementById("marketCalcModal").style.display="flex";
