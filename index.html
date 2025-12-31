@@ -249,6 +249,12 @@ button.primary{background:var(--accent);color:#000}
 .card.collapsed .char-content{
  display:none;
 }
+.char-header{
+ cursor:pointer;
+}
+.char-header button{
+ cursor:pointer;
+}
 </style>
 </head>
 
@@ -464,7 +470,7 @@ if(c.collapsed === undefined){
   const card=document.createElement("div");
   card.className="card";
   card.innerHTML=`
- <div class="char-header">
+<div class="char-header" data-char="${c.id}">
   <b>${c.name}</b>
 
   <div style="display:flex;gap:6px;align-items:center">
@@ -917,6 +923,19 @@ setInterval(()=>{
 
  autoResetCheck();
 },1000);
+// 🔥 CLICK HEADER TO COLLAPSE / EXPAND
+document.addEventListener("click", e => {
+ const header = e.target.closest(".char-header");
+ if (!header) return;
+
+ // ❌ kalau klik tombol / input → biarin
+ if (e.target.closest("button, input, select")) return;
+
+ const charId = header.dataset.char;
+ if (!charId) return;
+
+ toggleChar(charId);
+});
 /* ================= INIT ================= */
 if(!data.accounts.length){
  const name = prompt("Masukkan nama Account:");
