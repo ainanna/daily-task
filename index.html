@@ -305,12 +305,6 @@ data.accounts?.forEach(acc=>{
    // kalau lastReset belum pakai minute → sejajarkan
    const win = resetWindowId(t);
 
-   if(p.lastReset && p.lastReset !== win){
-    // JANGAN reset checklist lama
-    p.lastReset = win;
-    p.resetAt ??= 0;
-   }
-
    // sync counter lama
    if(t.max && p.count == null){
     p.count = p.checked ? t.max : 0;
@@ -964,8 +958,9 @@ name: name && name.trim() ? name.trim() : "Default",
  save();
 }
 // 🔥 cek reset SEKALI saat app dibuka
-setTimeout(autoResetCheck, 0);
-render();
+autoResetCheck(); // ⬅ reset dulu kalau ada yg kelewat
+
+render(); // ⬅ baru render UI
 async function forceUpdatePWA(){
  if(!confirm("Force update aplikasi?")) return;
 
