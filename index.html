@@ -418,7 +418,6 @@ function renderHeader(){
   <button onclick="addCharacter()" class="primary">+ Character</button>
   <button onclick="openTaskManager()">📝 Manage Task</button>
   <button onclick="openMarketCalc()">📊 Market Calc</button>
-
 <button onclick="toggleFocusMode()"
  style="
   border-color:${data.focusMode ? 'var(--ok)' : '#555'};
@@ -429,6 +428,7 @@ function renderHeader(){
 <button onclick="toggleExpandAll()" id="expandAllBtn">
  🔽 Expand All
 </button>
+<button onclick="openManualReset()">♻ Manual Reset</button>
   <button onclick="openResetSettings()">⚙ Reset Settings</button>
 
   <button onclick="resetAllData()"
@@ -1230,7 +1230,74 @@ function deleteTask(id){
  openTaskManager();
  render();
 }
+function openManualReset(){
+ const m = document.getElementById("manualResetModal");
+ m.style.display = "block";
 
+ m.innerHTML = `
+ <div class="modal-backdrop" onclick="closeManualReset(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+   <h3>♻ Manual Reset</h3>
+
+   <label><input type="checkbox" value="daily"> Daily</label><br>
+   <label><input type="checkbox" value="weekly"> Weekly</label><br>
+   <label><input type="checkbox" value="shop"> Weekly Shop</label><br>
+
+   <hr style="opacity:.3">
+
+   <label style="color:var(--danger)">
+    <input type="checkbox" value="all"> Reset SEMUA
+   </label>
+
+   <div class="modal-footer">
+    <button onclick="closeManualReset()">Cancel</button>
+    <button class="primary" onclick="applyManualReset()">Reset</button>
+   </div>
+  </div>
+ </div>`;
+}
+
+function closeManualReset(e){
+ if(e && e.target !== e.currentTarget) return;
+ document.getElementById("manualResetModal").style.display="none";
+}
+function applyManualReset(){
+ const modal = document.getElementById("manualResetModal");
+ const checked = [...modal.querySelectorAll("input[type=checkbox]:checked")]
+  .map(i => i.value);
+
+ if(!checked.length){
+  alert("Pilih minimal satu kategori");
+  return;
+ }
+
+
+ const resetAll = checked.includes("all");
+
+ data.accounts.forEach(acc=>{
+  acc.characters.forEach(c=>{
+   data.tasks.forEach(t=>{
+    if(!c.progress[t.id]) return;
+
+    if(
+     resetAll ||
+     checked.includes(t.type)
+    ){
+     c.progress[t.id] = {
+      checked:false,
+      count: t.max ? 0 : undefined,
+      lastReset: resetWindowId(t),
+      resetAt: Date.now()
+     };
+    }
+   });
+  });
+ });
+
+ save();
+ closeManualReset();
+ render();
+}
 </script>
 <script>
 let marketCalcInited = false;
@@ -1421,6 +1488,6 @@ function toggleFocusMode(){
   </div>
  </div>
 </div>
-
+<div id="manualResetModal" style="display:none"></div>
 </body>
 </html>
