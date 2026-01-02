@@ -136,9 +136,6 @@ button.primary{background:var(--accent);color:#000}
 }
 .card{background:var(--card);border-radius:14px;padding:12px;transition: all .25s ease;}
 
-.char-header{
- display:flex;justify-content:space-between;align-items:center
-}
 
 .section{margin-top:10px;border-radius:10px;padding:8px}
 .section.daily{background:var(--daily)}
@@ -250,6 +247,9 @@ button.primary{background:var(--accent);color:#000}
  display:none;
 }
 .char-header{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
  cursor:pointer;
 }
 .char-header button{
@@ -257,6 +257,58 @@ button.primary{background:var(--accent);color:#000}
 }
 .task:focus-within{
  box-shadow: 0 0 0 1px var(--accent);
+}
+.section.abyss{
+ background:#1e1b14;
+ border:1px solid #3a3323;
+ box-shadow:none;
+}
+
+/* header */
+.section.abyss h4{
+ color:#d8c9a3;
+ font-size:13px;
+ letter-spacing:1.2px;
+}
+
+/* badge */
+.abyss-badge{
+ background:#2b2618;
+ color:#e6d6a8;
+ font-size:10px;
+ font-weight:700;
+ padding:2px 10px;
+ border-radius:999px;
+ box-shadow:none;
+}
+
+/* task row */
+.section.abyss .task{
+ background:transparent;
+ border:1px solid rgba(216,201,163,.15);
+}
+.section.abyss .task.reset-now{
+ background:rgba(201,178,124,.12);
+ border:1px solid #c9b27c;
+}
+
+/* progress bar */
+.progress-abyss .progress{
+ height:8px;
+ background:#15130e;
+ border-radius:999px;
+}
+
+/* isi progress */
+.progress-abyss .progress span{
+ background:#c9b27c;
+ box-shadow:none;
+}
+
+/* label */
+.progress-abyss .progress-label{
+ font-weight:600;
+ color:#cfc3a0;
 }
 </style>
 </head>
@@ -281,12 +333,13 @@ tasks:[
  {id:"t2",name:"Daily Dungeon",type:"daily",active:true,hour:4,minute:0},
  {id:"t3",name:"Duty",type:"daily",active:true,hour:4,minute:0},
  {id:"t3a",name:"Shugo Festival",type:"daily",active:true,hour:4,minute:0,max:2},
- {id:"t4",name:"Raid",type:"weekly",active:true,day:3,hour:4,minute:0},
+ {id:"tAC",name:"Abyss Corridor",type:"manual",active:true,max:3},
+ {id:"t4", name:"Raid", type:"weekly", active:true, day:3, hour:4,minute:0},
  {id:"t5",name:"Ascension Trial",type:"weekly",active:true,day:3,hour:4,minute:0},
  {id:"t6",name:"Weekly Scroll",type:"weekly",active:true,day:3,hour:4,minute:0},
  {id:"t7",name:"Abyss Scroll",type:"weekly",active:true,day:3,hour:4,minute:0},
-{id:"t8",name:"Arcanist",type:"weekly",active:true,day:3,hour:4,minute:0,max:5},
-{id:"t9",name:"Deus",type:"weekly",active:true,day:3,hour:4,minute:0,max:5},
+ {id:"t8",name:"Arcanist",type:"weekly",active:true,day:3,hour:4,minute:0,max:5},
+ {id:"t9",name:"Deus",type:"weekly",active:true,day:3,hour:4,minute:0,max:5},
  {id:"t10",name:"Odyle Craft",type:"weekly",active:true,day:3,hour:4,minute:0},
 
  {id:"t11",name:"Odyle Shop",type:"shop",active:true,day:0,hour:23,minute:0}
@@ -358,6 +411,7 @@ function autoResetCheck(){
  data.accounts.forEach(acc=>{
   acc.characters.forEach(c=>{
    data.tasks.forEach(t=>{
+ if(t.type === "manual") return; // ⛔ JANGAN AUTO RESET
     const win = resetWindowId(t);
     const p = c.progress[t.id];
     if(!p) return;
@@ -439,9 +493,16 @@ function renderHeader(){
 
  `;
 }
+function hideEmptySection(section){
+ if(!section) return;
+ if(!section.querySelector(".task")){
+  section.remove();
+ }
+}
 /* ================= RENDER ================= */
 const app = document.getElementById("app");
 function render(){
+let hasManualTask = false;
    renderHeader();
     const accountSelect = document.getElementById("accountSelect");
  if(!accountSelect) return;
@@ -461,7 +522,10 @@ data.tasks.forEach(t => t.minute ??= 0);
 if(c.collapsed === undefined){
  c.collapsed = false;
 }
-  let dDone=0,dTotal=0,wDone=0,wTotal=0,sDone=0,sTotal=0;
+let dDone=0,dTotal=0;
+let wDone=0,wTotal=0;
+let sDone=0,sTotal=0;
+let mDone=0,mTotal=0;
 
   const card=document.createElement("div");
   card.className="card";
@@ -500,7 +564,14 @@ if(c.collapsed === undefined){
   const daily=document.createElement("div");
   daily.className="section daily";
   daily.innerHTML=`<div class="section-header"><h4>DAILY</h4><span class="countdown" data-type="daily">${sectionCountdown("daily")}</span></div>`;
-
+  const manual = document.createElement("div");
+  manual.className = "section abyss";
+  manual.innerHTML = `
+ <div class="section-header">
+  <h4>ABYSS CORRIDOR</h4>
+  <span class="abyss-badge">PRIORITY</span>
+ </div>
+`;
   const weekly=document.createElement("div");
   weekly.className="section weekly";
   weekly.innerHTML=`<div class="section-header"><h4>WEEKLY</h4><span class="countdown" data-type="weekly">${sectionCountdown("weekly")}</span></div>`;
@@ -529,6 +600,22 @@ if(t.type === "daily"){
  dTotal++;
  if(c.progress[t.id].checked) dDone++;
 }
+else if(t.type === "manual"){
+ sec = manual;
+ hasManualTask = true;
+
+ // 🟢 hitung TASK (bukan max)
+ mTotal++;
+
+ // 🟢 DONE kalau:
+ if(t.max){
+  if((c.progress[t.id].count || 0) >= t.max){
+   mDone++;
+  }
+ }else if(c.progress[t.id].checked){
+  mDone++;
+ }
+}
 else if(t.type === "weekly"){
  sec = weekly;
  wTotal++;
@@ -540,7 +627,7 @@ else if(t.type === "shop"){
  if(c.progress[t.id].checked) sDone++;
 }
 else{
- return; // ⛔ skip task tidak dikenal
+ return;
 }
 
 const row=document.createElement("div");
@@ -657,7 +744,12 @@ if(t.max){
 }
    sec.append(row);
   });
-
+hideEmptySection(daily);
+if(!hasManualTask){
+ hideEmptySection(manual);
+}
+hideEmptySection(weekly);
+hideEmptySection(shop);
 // 🔽 WRAP CONTENT CHARACTER (COLLAPSE SUPPORT)
 const content = document.createElement("div");
 content.className = "char-content";
@@ -668,11 +760,15 @@ if(c.collapsed){
  card.classList.remove("collapsed");
 }
 
-content.append(
- daily,progressBar("daily",dDone,dTotal),
- weekly,progressBar("weekly",wDone,wTotal),
- shop,progressBar("shop",sDone,sTotal)
-);
+if(dTotal) content.append(daily,progressBar("daily",dDone,dTotal));
+if(hasManualTask){
+ content.append(
+  manual,
+  progressBar("manual", mDone, mTotal || 1)
+ );
+}
+if(wTotal) content.append(weekly,progressBar("weekly",wDone,wTotal));
+if(sTotal) content.append(shop,progressBar("shop",sDone,sTotal));
 
 card.append(content);
 app.append(card);
@@ -704,16 +800,33 @@ function progressBar(type, done, total){
 function updateProgress(card, character){
  const sections = {
   daily:{done:0,total:0},
+  manual:{done:0,total:0},
   weekly:{done:0,total:0},
   shop:{done:0,total:0}
  };
 
 data.tasks
- .filter(t => t.active !== false) // 🔥 PATCH
+ .filter(t => t.active !== false)
  .forEach(t=>{
   const p = character.progress[t.id];
   if(!p || !sections[t.type]) return;
 
+  // 🔥 ABYSS = COUNTER
+if(t.type === "manual"){
+ sections.manual.total++;
+
+ if(t.max){
+  if((p.count || 0) >= t.max){
+   sections.manual.done++;
+  }
+ }else if(p.checked){
+  sections.manual.done++;
+ }
+
+ return;
+}
+
+  // NORMAL CHECKLIST
   sections[t.type].total++;
   if(p.checked) sections[t.type].done++;
  });
@@ -1103,6 +1216,7 @@ function openTaskManager(){
 
    <div style="margin-top:10px">
     ${renderList("daily","DAILY","var(--accent)")}
+    ${renderList("manual","ABYSS / MANUAL","var(--accent)")}
     ${renderList("weekly","WEEKLY","var(--weeklyAccent)")}
     ${renderList("shop","WEEKLY SHOP","var(--shopAccent)")}
    </div>
@@ -1142,7 +1256,7 @@ function openTaskForm(task=null){
    <div class="form-row">
     <label>Kategori</label>
     <select id="taskType">
-     ${["daily","weekly","shop"].map(t=>
+     ${["daily","manual","weekly","shop"].map(t=>
       `<option ${task?.type===t?"selected":""}>${t}</option>`
      ).join("")}
     </select>
@@ -1192,17 +1306,17 @@ function saveTask(id){
   data.resetConfig ??= {};     
   const cfg = data.resetConfig[type] ?? {};
 
-  data.tasks.push({
-   id: "t" + Date.now(),
-   name,
-   type,
-   max,
-   active: true,
+data.tasks.push({
+ id: "t" + Date.now(),
+ name,
+ type,
+ max,
+ active: true,
 
-   day: type !== "daily" ? cfg.day : undefined,
-   hour: cfg.hour ?? 4,
-   minute: cfg.minute ?? 0
-  });
+ day: type === "daily" ? undefined : (cfg.day ?? 0),
+ hour: cfg.hour ?? 4,
+ minute: cfg.minute ?? 0
+});
  }
 
  save();
@@ -1240,6 +1354,7 @@ function openManualReset(){
    <h3>♻ Manual Reset</h3>
 
    <label><input type="checkbox" value="daily"> Daily</label><br>
+   <label><input type="checkbox" value="manual"> Abyss Corridor</label><br>
    <label><input type="checkbox" value="weekly"> Weekly</label><br>
    <label><input type="checkbox" value="shop"> Weekly Shop</label><br>
 
@@ -1340,38 +1455,42 @@ function initMarketCalc(){
  let STEP = 1000;
  const amt = document.getElementById("calcAmount");
 
- function calc(){
-  const raw = parseRupiah(amt.value);
+function calc(){
+ const raw = parseRupiah(amt.value);
 
-  // auto format input
-  if(amt.value){
-   amt.value = formatRupiah(raw);
-  }
-
-  if(!raw){
-   document.querySelector("#calcA b").textContent="-";
-   document.querySelector("#calcB b").textContent="-";
-   document.getElementById("calcDiff").textContent="-";
-   return;
-  }
-
-  const mode = document.querySelector('input[name="calcMode"]:checked').value;
-  let a,b,d;
-
-  if(mode==="gross"){
-   a = Math.floor(raw * 0.9);
-   b = Math.floor(raw * 0.8);
-   d = a - b;
-  }else{
-   a = Math.ceil(raw / 0.9);
-   b = Math.ceil(raw / 0.8);
-   d = b - a;
-  }
-
-  document.querySelector("#calcA b").textContent = formatRupiah(a);
-  document.querySelector("#calcB b").textContent = formatRupiah(b);
-  document.getElementById("calcDiff").textContent = formatRupiah(d);
+ // auto format input
+ if(amt.value){
+  amt.value = formatRupiah(raw);
  }
+
+ const aEl = document.querySelector("#calcA b");
+ const bEl = document.querySelector("#calcB b");
+ const dEl = document.getElementById("calcDiff");
+
+ if(!raw){
+  if(aEl) aEl.textContent = "-";
+  if(bEl) bEl.textContent = "-";
+  if(dEl) dEl.textContent = "-";
+  return;
+ }
+
+ const mode = document.querySelector('input[name="calcMode"]:checked').value;
+ let a,b,d;
+
+ if(mode==="gross"){
+  a = Math.floor(raw * 0.9);
+  b = Math.floor(raw * 0.8);
+  d = a - b;
+ }else{
+  a = Math.ceil(raw / 0.9);
+  b = Math.ceil(raw / 0.8);
+  d = b - a;
+ }
+
+ if(aEl) aEl.textContent = formatRupiah(a);
+ if(bEl) bEl.textContent = formatRupiah(b);
+ if(dEl) dEl.textContent = formatRupiah(d);
+}
 
  amt.oninput = calc;
 
