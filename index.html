@@ -568,7 +568,7 @@ let mDone=0,mTotal=0;
   manual.className = "section abyss";
   manual.innerHTML = `
  <div class="section-header">
-  <h4>Spesial Task</h4>
+  <h4>Spesial</h4>
   <span class="abyss-badge">PRIORITY</span>
  </div>
 `;
@@ -1091,13 +1091,7 @@ async function forceUpdatePWA(){
 
  location.reload();
 }
-function showUpdatePopup(){
- document.getElementById("updatePopup").classList.remove("hidden");
-}
 
-function hideUpdate(){
- document.getElementById("updatePopup").classList.add("hidden");
-}
 
 async function applyUpdate(){
  const regs = await navigator.serviceWorker.getRegistrations();
@@ -1216,7 +1210,7 @@ function openTaskManager(){
 
    <div style="margin-top:10px">
     ${renderList("daily","DAILY","var(--accent)")}
-    ${renderList("manual","ABYSS / MANUAL","var(--accent)")}
+    ${renderList("manual","Spesial","var(--accent)")}
     ${renderList("weekly","WEEKLY","var(--weeklyAccent)")}
     ${renderList("shop","WEEKLY SHOP","var(--shopAccent)")}
    </div>
@@ -1303,8 +1297,6 @@ function saveTask(id){
 
  }else{
   // ADD BARU
-  data.resetConfig ??= {};     
-  const cfg = data.resetConfig[type] ?? {};
 
 data.tasks.push({
  id: "t" + Date.now(),
@@ -1313,9 +1305,9 @@ data.tasks.push({
  max,
  active: true,
 
- day: type === "daily" ? undefined : (cfg.day ?? 0),
- hour: cfg.hour ?? 4,
- minute: cfg.minute ?? 0
+ day: type === "daily" ? undefined : 0,
+ hour: 4,
+ minute: 0
 });
  }
 
@@ -1354,7 +1346,7 @@ function openManualReset(){
    <h3>♻ Manual Reset</h3>
 
    <label><input type="checkbox" value="daily"> Daily</label><br>
-   <label><input type="checkbox" value="manual"> Abyss Corridor</label><br>
+   <label><input type="checkbox" value="manual"> Spesial</label><br>
    <label><input type="checkbox" value="weekly"> Weekly</label><br>
    <label><input type="checkbox" value="shop"> Weekly Shop</label><br>
 
@@ -1556,16 +1548,7 @@ function toggleFocusMode(){
 </script>
 <div id="resetModal" style="display:none"></div>
 <div id="taskModal" style="display:none"></div>
-<div id="updatePopup" class="update-popup hidden">
- <div class="update-card">
-  <h3>Update tersedia 🚀</h3>
-  <p>Versi terbaru aplikasi sudah siap.</p>
-  <div class="update-actions">
-   <button onclick="applyUpdate()">Update sekarang</button>
-   <button class="ghost" onclick="hideUpdate()">Nanti</button>
-  </div>
- </div>
-</div>
+
 <div id="marketCalcModal" class="modal-backdrop" style="display:none">
  <div class="modal" onclick="event.stopPropagation()">
   <div style="display:flex;justify-content:space-between;align-items:center">
