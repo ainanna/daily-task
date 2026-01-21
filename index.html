@@ -499,16 +499,26 @@ function resetWindowId(t){
 }
 
 function nextReset(t){
- const d=now(),r=new Date(d);
- if(t.type==="daily"){
+ if((t.type === "weekly" || t.type === "shop") && typeof t.day !== "number"){
+  console.warn("Task missing day:", t);
+  return new Date(Date.now() + 3600000); // fallback 1 jam
+ }
+
+ const d = now();
+ const r = new Date(d);
+
+ // DAILY
+ if(t.type === "daily"){
   r.setHours(t.hour, t.minute || 0, 0, 0);
-  if(d>=r) r.setDate(r.getDate()+1);
+  if(d >= r) r.setDate(r.getDate() + 1);
   return r;
  }
- const diff=(t.day-d.getDay()+7)%7;
- r.setDate(d.getDate()+diff);
+
+ // WEEKLY / SHOP
+ const diff = (t.day - d.getDay() + 7) % 7;
+ r.setDate(d.getDate() + diff);
  r.setHours(t.hour, t.minute || 0, 0, 0);
- if(d>=r) r.setDate(r.getDate()+7);
+ if(d >= r) r.setDate(r.getDate() + 7);
  return r;
 }
 function autoResetCheck(){
@@ -1411,15 +1421,34 @@ function saveTask(id){
  const max = maxVal > 0 ? maxVal : undefined;
 
  if(id){
-  // EDIT
-  const t = data.tasks.find(t => t.id === id);
-  if(!t) return;
+ const t = data.tasks.find(t => t.id === id);
+ if(!t) return;
 
-  t.name = name;
-  t.type = type;
-  t.max  = max;
+ const oldType = t.type;
 
- }else{
+ t.name = name;
+ t.type = type;
+ t.max  = max;
+
+ // 🔥 FIX RESET CONFIG SESUAI TYPE BARU
+ if(type === "daily"){
+  t.day = undefined;
+  t.hour ??= 4;
+  t.minute ??= 0;
+ }
+
+ if(type === "weekly" || type === "shop"){
+  t.day ??= 3;        // default Wednesday
+  t.hour ??= 4;
+  t.minute ??= 0;
+ }
+
+ if(type === "manual"){
+  delete t.day;
+  delete t.hour;
+  delete t.minute;
+ }
+}else{
   // ADD BARU
 
 data.tasks.push({
