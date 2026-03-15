@@ -410,6 +410,37 @@ body.compact .progress-wrap{
 body.compact .progress-label{
  font-size:10px;
 }
+.arcana-board{
+display:flex;
+justify-content:center;
+gap:12px;
+margin-top:14px;
+}
+
+.arcana-card{
+width:90px;
+height:130px;
+background:linear-gradient(160deg,#1c2748,#0b1220);
+border:1px solid #243056;
+border-radius:10px;
+display:flex;
+align-items:center;
+justify-content:center;
+font-size:26px;
+cursor:pointer;
+transition:.4s;
+}
+
+.arcana-card:hover{
+transform:translateY(-4px);
+box-shadow:0 0 10px rgba(79,195,247,.4);
+}
+
+.arcana-card.open{
+background:linear-gradient(160deg,#c8a03a,#8a6a1f);
+color:#111;
+box-shadow:0 0 10px rgba(255,215,0,.5);
+}
 </style>
 </head>
 
@@ -587,6 +618,7 @@ function renderHeader(){
   <button onclick="addAccount()">+ Account</button>
   <button onclick="addCharacter()" class="primary">+ Character</button>
   <button onclick="openTaskManager()">📝 Manage Task</button>
+  <button onclick="openArcana()">🎴 Shugo Reward</button>
   <button onclick="openMarketCalc()">📊 Market Calc</button>
 <button onclick="toggleFocusMode()"
  style="
@@ -1698,6 +1730,87 @@ function toggleFocusMode(){
  save();
  render();
 }
+function openArcana(){
+
+const m=document.getElementById("arcanaModal")
+
+m.style.display="block"
+
+m.innerHTML=`
+
+<div class="modal-backdrop" onclick="closeArcana(event)">
+
+<div class="modal" onclick="event.stopPropagation()">
+
+<h3>🎴 Shugo Reward Simulator</h3>
+
+<p style="font-size:12px;opacity:.7">
+Pilih satu kartu untuk mencoba keberuntungan
+</p>
+
+<div class="arcana-board">
+
+${[1,2,3,4,5].map(i=>`
+<div class="arcana-card" onclick="pickArcana(this)">
+❓
+</div>
+`).join("")}
+
+</div>
+
+<div class="modal-footer">
+<button onclick="resetArcana()">🔄 Draw Ulang</button>
+<button onclick="closeArcana()">Close</button>
+</div>
+
+</div>
+</div>
+
+`
+
+}
+
+function closeArcana(e){
+if(e && e.target!==e.currentTarget)return
+document.getElementById("arcanaModal").style.display="none"
+}
+
+let arcanaLock=false
+
+function pickArcana(el){
+
+if(arcanaLock) return
+arcanaLock=true
+
+const cards=[...document.querySelectorAll(".arcana-card")]
+
+const jackpotCount=Math.floor(Math.random()*3)+1
+let jackpotIndex=[]
+
+while(jackpotIndex.length<jackpotCount){
+ let r=Math.floor(Math.random()*5)
+ if(!jackpotIndex.includes(r)) jackpotIndex.push(r)
+}
+
+cards.forEach((c,i)=>{
+ setTimeout(()=>{
+  c.classList.add("open")
+  c.textContent=jackpotIndex.includes(i) ? "💎" : "☠"
+ },i*120)
+})
+
+}
+
+function resetArcana(){
+
+arcanaLock=false
+
+document.querySelectorAll(".arcana-card").forEach(c=>{
+ c.classList.remove("open")
+ c.textContent="❓"
+})
+
+}
 </script>
 <div id="resetModal" style="display:none"></div>
 <div id="taskModal" style="display:none"></div>
@@ -1744,5 +1857,6 @@ function toggleFocusMode(){
  </div>
 </div>
 <div id="manualResetModal" style="display:none"></div>
+<div id="arcanaModal" style="display:none"></div>
 </body>
 </html>
