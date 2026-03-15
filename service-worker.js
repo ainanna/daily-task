@@ -1,4 +1,4 @@
-const VERSION = "7.5.1"; // 🔥 GANTI SETIAP UPDATE
+const VERSION = "7.5.2"; // 🔥 GANTI SETIAP UPDATE
 const CACHE_NAME = `daily-task-${VERSION}`;
 const BASE = "/daily-task/";
 
